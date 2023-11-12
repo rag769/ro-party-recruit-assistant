@@ -9,33 +9,57 @@ intents = discord.Intents.default()
 intents.members = True
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="?", intents=intents)
+bot = commands.Bot(command_prefix=config.COMMAND_PREFIX, intents=intents)
+
+
+class EventSelect(discord.ui.Select):
+    def __init__(self, guild):
+        self._guild = guild
+        options = []
+        for event in guild.scheduled_events:
+            options.append(discord.SelectOption(label=event.name, value=event.id))
+        super().__init__(placeholder="どのイベントを精錬するんだ", options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        event = self._guild.get_scheduled_event(int(self.values[0]))
+        if not os.path.exists(f"{event.id}.json"):
+            await interaction.response.send_message(content="クホホホホ...そのイベントは管理してないぞ")
+            return
+        with open(f"{event.id}.json") as f:
+            d = json.load(f)
+        confirmed_users = []
+        waiting_users = []
+        for u in d["confirmed"]:
+            confirmed_users.append(event.guild.get_member(u).display_name)
+        for u in d["waiting"]:
+            waiting_users.append(event.guild.get_member(u).display_name)
+
+        embed = discord.Embed(title=event.name)
+        lf = "\n"
+        embed.add_field(
+            name="参加者", value=f"```{lf.join(confirmed_users)}```", inline="true"
+        )
+        if len(waiting_users) > 0:
+            embed.add_field(
+                name="キャンセル待ち",
+                value=f"```{lf.join(waiting_users)}```",
+                inline="true",
+            )
+        await interaction.response.send_message(embed=embed)
+        self.disabled = True
+
+
+class EventSelectView(discord.ui.View):
+    def __init__(self, guild, timeout=5):
+        super().__init__(timeout=timeout)
+        if len(guild.scheduled_events) > 0:
+            self.add_item(EventSelect(guild))
 
 
 @bot.command()
-async def show(ctx, event_id: int):
-    event = ctx.guild.get_scheduled_event(event_id)
-    if event is None:
-        await ctx.send("お前の頭を精錬してやろうか！")
-        return
-    if not os.path.exists(f"{event.id}.json"):
-        await ctx.send("クホホホホ...そのイベントは管理してないぞ")
-        return
-    with open(f"{event.id}.json") as f:
-        d = json.load(f)
-
-    confirmed_users = []
-    waiting_users = []
-    for u in d["confirmed"]:
-        confirmed_users.append(ctx.guild.get_member(u).display_name)
-    message = f"参加者: {confirmed_users}"
-
-    if len(d["waiting"]) > 0:
-        for u in d["waiting"]:
-            waiting_users.append(ctx.guild.get_member(u).display_name)
-        message += f"\nキャンセル待ち: {waiting_users}"
-
-    await ctx.send(message)
+async def show(ctx):
+    view = EventSelectView(ctx.guild)
+    await ctx.send(view=view, delete_after=5)
 
 
 @bot.command()
