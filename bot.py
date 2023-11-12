@@ -37,12 +37,12 @@ class EventSelect(discord.ui.Select):
         embed = discord.Embed(title=event.name)
         lf = "\n"
         embed.add_field(
-            name="参加者", value=f"```{lf.join(confirmed_users)}```", inline="true"
+            name="参加者", value=f"```\n{lf.join(confirmed_users)}```", inline="true"
         )
         if len(waiting_users) > 0:
             embed.add_field(
                 name="キャンセル待ち",
-                value=f"```{lf.join(waiting_users)}```",
+                value=f"```\n{lf.join(waiting_users)}```",
                 inline="true",
             )
         await interaction.response.send_message(embed=embed)
